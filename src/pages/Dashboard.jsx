@@ -1,0 +1,319 @@
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from 'react-router-dom';
+import { createReferral, getMyReferrals, getIncomingReferrals, updateReferralStatus } from "../services/referralApi";
+import { logoutUser } from "../services/authApi";
+import { useAuth } from '../context/authContext';
+
+export default function DashboardPage() {
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [showModal, setShowModal] = useState(false);
+    const [company, setCompany] = useState("");
+    const [jobId, setJobId] = useState("");
+    const [resume, setResume] = useState(null);
+    const [referredStatus, setReferredStatus] = useState({});
+    const dropdownRef = useRef(null);
+    const effectRan = useRef(false);
+    const navigate = useNavigate();
+
+    const [myRequests, setMyRequests] = useState([]);
+    const [incomingRequests, setIncomingRequests] = useState([]);
+
+    const [loading, setLoading] = useState(false);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const [incomingPage, setIncomingPage] = useState(1);
+    const pageSize = 5;
+
+    const [sortBy, setSortBy] = useState("date");
+    const { user, setUser} = useAuth();
+    
+
+    const fetchData = async () => {
+        const myReferralReqBody = {
+            userId: user.id
+        }
+        const myReferralRequests = await getMyReferrals('1');
+        setMyRequests([...myReferralRequests].sort((a, b) => {
+            return new Date(b.createdAt) - new Date(a.createdAt);
+        }
+        ));
+
+        const myIncomingReferralsBody = {
+            'company': user.company
+        }
+        const myIncomingReferrals = await getIncomingReferrals('arm');
+        setIncomingRequests(myIncomingReferrals)
+    }
+
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setDropdownOpen(false);
+            }
+        }
+        // This is added to make sure data is only loaded once
+        if (!effectRan.current) {
+            setLoading(true);
+            fetchData();
+            effectRan.current = true;
+            setLoading(false);
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
+
+    const paginatedMyReferrals = myRequests.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize
+    );
+
+    const paginatedIncomingReferrals = incomingRequests.slice(
+        (incomingPage - 1) * pageSize,
+        incomingPage * pageSize
+    );
+
+    const handleNewReferralSubmit = async () => {
+        setLoading(true);
+        const createReferralData = {
+            userId: '1',
+            jobId: jobId,
+            company: company,
+            resumeUrl: 'http://someurl.com'
+        }
+        try {
+            const createRequest = await createReferral(createReferralData)
+            setShowModal(false);
+            fetchData();
+            setLoading(false);
+        } catch (error) {
+            window.alert('Failed to create Referral Request! Pleae try again')
+            setLoading(false);
+
+        }
+    }
+
+    const handleLogout = async() => {
+        const response = await logoutUser();
+        navigate('/')
+    }
+
+    const isReferralFormValid = company.trim() !== "" && jobId.trim() !== "";
+
+    // const dummyRequests = [
+    //     { company: "Amazon", jobId: "AMZ12345", status: "Yet to be referred" },
+    //     { company: "Google", jobId: "GOOG56789", status: "Referred", referredBy: "Jane Williams" }
+    // ];
+
+    // const incomingRequests = [
+    //     { name: "Alice Smith", email: "alice@example.com", jobId: "AMZ12345", resumeUrl: "/resumes/alice-smith.pdf" },
+    //     { name: "John Doe", email: "john@example.com", jobId: "GOOG56789", resumeUrl: "/resumes/john-doe.pdf" }
+    // ];
+
+    const handleMarkReferred = async (index) => {
+        setLoading(true);
+        try {
+            const data = {
+                status: 'referred'
+            }
+            const response = await updateReferralStatus(index, 'referred');
+            fetchData();
+            setLoading(false);
+        }
+        catch (error) {
+            setLoading(false);
+        }
+        // setReferredStatus(prev => ({ ...prev, [index]: true }));
+    };
+
+    return (
+        <div className="min-h-screen bg-gradient-to-b from-gray-100 to-blue-100">
+            <header className="bg-white shadow px-6 py-4 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <img src="/logos/refer_fit.png" alt="Logo" className="h-8 w-8" />
+                    <h1 className="text-2xl font-extrabold text-blue-700">REFER FIT</h1>
+                </div>
+
+                <div className="relative" ref={dropdownRef}>
+                    <img
+                        src="/logos/profile.jpg"
+                        alt="Profile"
+                        className="h-10 w-10 rounded-full cursor-pointer border"
+                        onClick={() => setDropdownOpen(!dropdownOpen)}
+                    />
+
+                    {dropdownOpen && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-md py-2 z-50">
+                            <a href="/edit-profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-100">Edit Profile</a>
+                            <a onClick={handleLogout} className="block px-4 py-2 text-gray-700 hover:bg-gray-100">Logout</a>
+                        </div>
+                    )}
+                </div>
+            </header>
+
+            <main className="p-4 sm:p-6 max-w-6xl mx-auto space-y-10">
+                {loading && (
+                    <div className="fixed inset-0 bg-white bg-opacity-75 z-50 flex items-center justify-center">
+                        <div className="w-12 h-12 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
+                    </div>
+                )}
+                <section>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-2xl font-bold text-blue-700">My Referral Requests</h2>
+                        <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">+ New Request</button>
+                    </div>
+
+                    <div className="bg-white shadow rounded-lg overflow-x-auto">
+                        <table className="w-full min-w-[600px] text-left">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Company</th>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Job ID</th>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Created Date</th>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedMyReferrals.map((req, idx) => (
+                                    <tr key={idx} className="border-t">
+                                        <td className="px-4 py-2 text-gray-700">{req.company}</td>
+                                        <td className="px-4 py-2 text-gray-700">{req.jobId}</td>
+                                        <td className="px-4 py-2 text-gray-700">{new Date(req.createdAt).toLocaleDateString("en-IN", {
+                                            year: "numeric",
+                                            month: "short",
+                                            day: "numeric"
+                                        })}</td>
+                                        <td className="px-4 py-2 text-sm font-medium">
+                                            <span
+                                                title={req.status === 'referred' ? `Referred by ${req.referredBy}` : ''}
+                                                className={`px-2 py-1 rounded-full text-white text-xs ${req.status === 'referred' ? 'bg-green-500' : 'bg-yellow-500'}`}
+                                            >
+                                                {req.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="flex justify-center gap-2 mt-4 mb-6">
+                        <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1} className="px-3 py-1 bg-blue-600 rounded disabled:bg-gray-400 disabled:opacity-50">Prev</button>
+                        <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage * pageSize >= myRequests.length} className="px-3 py-1 bg-blue-600 rounded disabled:bg-gray-400 disabled:opacity-50">Next</button>
+                    </div>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-bold text-blue-700 mb-4">Referral Requests to My Company</h2>
+                    <div className="bg-white shadow rounded-lg overflow-x-auto">
+                        <table className="w-full min-w-[800px] text-left">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Candidate Name</th>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Email</th>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Job ID</th>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Requested On</th>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Resume</th>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedIncomingReferrals.map((req, idx) => (
+                                    <tr key={idx} className="border-t">
+                                        <td className="px-4 py-2 text-gray-700">{req.User.name}</td>
+                                        <td className="px-4 py-2 text-gray-700">{req.User.email}</td>
+                                        <td className="px-4 py-2 text-gray-700">{req.jobId}</td>
+                                        <td className="px-4 py-2 text-gray-700">{new Date(req.createdAt).toLocaleDateString("en-IN", {
+                                            year: "numeric",
+                                            month: "short",
+                                            day: "numeric"
+                                        })}</td>
+                                        <td className="px-4 py-2">
+                                            <a
+                                                href={req.resumeUrl}
+                                                className="text-blue-600 hover:underline text-sm"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                Download
+                                            </a>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            {referredStatus[idx] ? (
+                                                <span className="text-green-600 text-sm font-medium">Thank you</span>
+                                            ) : (
+                                                <button
+                                                    className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                                                    onClick={() => handleMarkReferred(req.id)}
+                                                >
+                                                    Mark as Referred
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="flex justify-center gap-2 mt-4 mb-6">
+                        <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={incomingPage === 1} className="px-3 py-1 bg-blue-600 rounded disabled:bg-gray-400 disabled:opacity-50">Prev</button>
+                        <button onClick={() => setCurrentPage(p => p + 1)} disabled={incomingPage * pageSize >= incomingRequests.length} className="px-3 py-1 bg-blue-600 rounded disabled:bg-gray-400 disabled:opacity-50">Next</button>
+                    </div>
+                </section>
+            </main>
+
+            {/* Create Referral Request Modal */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+                        <h3 className="text-xl font-semibold text-blue-600 mb-4">Create Referral Request</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                                <input
+                                    type="text"
+                                    value={company}
+                                    onChange={(e) => setCompany(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-md"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Job ID</label>
+                                <input
+                                    type="text"
+                                    value={jobId}
+                                    onChange={(e) => setJobId(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-md"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Resume</label>
+                                <input
+                                    type="file"
+                                    onChange={(e) => setResume(e.target.files[0])}
+                                    className="w-full px-4 py-2 border rounded-md"
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3">
+                                <button onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button>
+                                <button
+                                    // onClick={() => {
+                                    //     setShowModal(false);
+                                    //     alert("Referral submitted successfully!");
+                                    // }}
+                                    onClick={handleNewReferralSubmit}
+                                    disabled={!isReferralFormValid}
+                                    className={`px-4 py-2 rounded-md text-white ${isReferralFormValid ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
+                                >
+                                    Submit Referral
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+
