@@ -15,3 +15,13 @@ export const createUser = async (userData) => {
   
     return response.json(); // { user, new }
   };
+
+// updating resume details
+export const updateUserResumeDetails = async (id, data) => {
+  const response = await fetch(`${API_BASE}/resume/${id}`, {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', // required for JWT cookie auth
+    body: JSON.stringify(data)
+  })
+};

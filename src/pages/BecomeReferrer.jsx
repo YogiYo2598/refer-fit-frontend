@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createUser } from "../services/userApi"
-import { getOTP, verifyOTP } from "../services/authApi";
+import { getOTP, loginUser, verifyOTP } from "../services/authApi";
 
 export default function BecomeReferrerPage() {
     const navigate = useNavigate();
@@ -56,7 +56,7 @@ export default function BecomeReferrerPage() {
     const requestOTP = async () => {
         setLoading(true)
         const req_data = {
-            phone: "+91" + phone
+            phone: "91" + phone
         }
         const response = await getOTP(req_data);
         if (response.status != 500) {
@@ -64,21 +64,22 @@ export default function BecomeReferrerPage() {
             setIsPhoneVerifyClicked(true);
             setLoading(false)
         }
+        
     };
 
     const verifyValidOTP = async () => {
-        setLoading(true)
-        const reqBody = {
-            phone: "+91" + phone,
-            otp: otpPhone
+
+        setLoading(true);
+        const req_data = {
+            phone: "91" + phone,
+            code: otpPhone
         }
-        try {
-            // const response = await verifyOTP(reqBody);
-            setIsPhoneOtpVerified(true);
+        const response = await verifyOTP(req_data);
+        if(!response['ok']) {
+            window.alert("Invalid OTP, Please enter right OTP");
             setLoading(false);
-        }
-        catch (error) {
-            window.alert('wrong OTP, please try again!');
+        } else {
+            setIsPhoneOtpVerified(true);
             setLoading(false);
         }
     };
@@ -103,8 +104,9 @@ export default function BecomeReferrerPage() {
             }
             else {
                 setLoading(true);
+                // const response = await loginUser(phone);
                 setTimeout(() => {
-                    navigate("/dashboard");
+                    navigate("/login");
                 }, 2000);
             }
         }
@@ -125,7 +127,7 @@ export default function BecomeReferrerPage() {
                 )}
                 <form className="space-y-6" onSubmit={handleSubmit}>
                     <div>
-                        <label className="block text-gray-700 font-medium mb-1">Full Name</label>
+                        <label className="block text-gray-700 font-medium mb-1">Full Name *</label>
                         <input
                             type="text"
                             value={name}
@@ -136,7 +138,7 @@ export default function BecomeReferrerPage() {
                     </div>
 
                     <div>
-                        <label className="block text-gray-700 font-medium mb-1">Phone Number</label>
+                        <label className="block text-gray-700 font-medium mb-1">Phone Number *</label>
                         <div className="flex flex-col sm:flex-row gap-2">
                             <input
                                 type="text"
@@ -149,6 +151,7 @@ export default function BecomeReferrerPage() {
                         </div>
                         {verifyPhone && (
                             <div className="mt-2 space-y-2">
+                                <p className="text-green-600 text-sm font-medium">✅ OTP sent on whatsapp!</p>
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <input
                                         type="text"
@@ -172,7 +175,7 @@ export default function BecomeReferrerPage() {
                     </div>
 
                     <div>
-                        <label className="block text-gray-700 font-medium mb-1">Email</label>
+                        <label className="block text-gray-700 font-medium mb-1">Email *</label>
                         <div className="flex flex-col sm:flex-row gap-2">
                             <input
                                 type="email"
@@ -185,7 +188,7 @@ export default function BecomeReferrerPage() {
                     </div>
 
                     <div>
-                        <label className="block text-gray-700 font-medium mb-1">Current Company</label>
+                        <label className="block text-gray-700 font-medium mb-1">Current Company *</label>
                         <input
                             type="text"
                             value={company}
@@ -222,6 +225,7 @@ export default function BecomeReferrerPage() {
                         </button>
                     </div>
                 </form>
+                <p className="text-center mt-2 text-sm text-gray-600">By Registering, I consent to receive referral updates and follow-ups via WhatsApp *</p>
                 <p className="text-center mt-6 text-sm text-gray-600">
                     Already registered?{' '}
                     <button onClick={() => navigate("/login")} className="text-blue-600 font-medium hover:underline">

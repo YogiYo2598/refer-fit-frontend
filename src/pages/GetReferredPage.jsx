@@ -32,7 +32,7 @@ export default function RegisterPage() {
         isValidPhone &&
         isValidEmail &&
         isPhoneOtpVerified &&
-        (status === "student" || (status === "professional" && company.trim() !== ""));
+        (status === "fresher" || (status === "experienced" && company.trim() !== ""));
 
     const handleResendPhone = () => {
         if (!isPhoneOtpVerified) {
@@ -48,7 +48,7 @@ export default function RegisterPage() {
         }
     };
 
-    const handleRegister = async() => {
+    const handleRegister = async () => {
         setLoading(true);
         // setSuccess(true);
         // setTimeout(() => {
@@ -68,11 +68,13 @@ export default function RegisterPage() {
 
         try {
             const response = await createUser(userData);
-            if (response.new == false) {
+            // console.log(response)
+            if (response['new'] == false) {
                 window.alert("User already exists, please login!!");
                 navigate('/login')
             }
             else {
+                // const response = await loginUser(phone);
                 setLoading(false);
                 setTimeout(() => {
                     navigate("/dashboard");
@@ -95,7 +97,7 @@ export default function RegisterPage() {
     const requestOTP = async () => {
         setLoading(true)
         const req_data = {
-            phone: "+91" + phone
+            phone: "91" + phone
         }
         const response = await getOTP(req_data);
         if (response.status != 500) {
@@ -104,6 +106,22 @@ export default function RegisterPage() {
             setLoading(false)
         }
     };
+
+    const verifyMOTP = async () => {
+        setLoading(true);
+        const req_data = {
+            phone: "91" + phone,
+            code: otpPhone
+        }
+        const response = await verifyOTP(req_data);
+        if (!response['ok']) {
+            window.alert("Invalid OTP, Please enter right OTP");
+            setLoading(false);
+        } else {
+            setIsPhoneOtpVerified(true);
+            setLoading(false);
+        }
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50 px-4 py-10 flex flex-col items-center">
@@ -124,12 +142,12 @@ export default function RegisterPage() {
 
                 <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleRegister(); }}>
                     <div>
-                        <label className="block text-gray-700 font-medium mb-1">Name</label>
+                        <label className="block text-gray-700 font-medium mb-1">Name *</label>
                         <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-2 border rounded-md" />
                     </div>
 
                     <div>
-                        <label className="block text-gray-700 font-medium mb-1">Phone Number</label>
+                        <label className="block text-gray-700 font-medium mb-1">Phone Number *</label>
                         <div className="flex flex-col sm:flex-row gap-2">
                             <input
                                 type="text"
@@ -144,6 +162,7 @@ export default function RegisterPage() {
                         </div>
                         {verifyPhone && (
                             <div className="mt-2 space-y-2">
+                                <p className="text-green-600 text-sm font-medium">✅ OTP sent on whatsapp!</p>
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <input
                                         type="text"
@@ -155,13 +174,13 @@ export default function RegisterPage() {
                                     />
                                     <button
                                         type="button"
-                                        onClick={() => setIsPhoneOtpVerified(isValidOtp(otpPhone))}
+                                        onClick={verifyMOTP}
                                         disabled={!isValidOtp(otpPhone) || isPhoneOtpVerified}
                                         className={`px-4 py-2 rounded-md text-white ${isValidOtp(otpPhone) && !isPhoneOtpVerified ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}
                                     >
                                         Verify OTP
                                     </button>
-                                    <button type="button" onClick={handleResendPhone} disabled={isPhoneOtpVerified} className={`px-4 py-2 rounded-md ${isPhoneOtpVerified ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+                                    <button type="button" onClick={requestOTP} disabled={isPhoneOtpVerified} className={`px-4 py-2 rounded-md ${isPhoneOtpVerified ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
                                         Resend
                                     </button>
                                 </div>
@@ -171,7 +190,7 @@ export default function RegisterPage() {
                     </div>
 
                     <div>
-                        <label className="block text-gray-700 font-medium mb-1">Email</label>
+                        <label className="block text-gray-700 font-medium mb-1">Email *</label>
                         <div className="flex flex-col sm:flex-row gap-2">
                             <input
                                 type="email"
@@ -213,7 +232,7 @@ export default function RegisterPage() {
                     </div>
 
                     <div>
-                        <label className="block text-gray-700 font-medium mb-1">Status</label>
+                        <label className="block text-gray-700 font-medium mb-1">Status *</label>
                         <div className="relative">
                             <select
                                 value={status}
@@ -229,9 +248,9 @@ export default function RegisterPage() {
                         </div>
                     </div>
 
-                    {status === "professional" && (
+                    {status === "experienced" && (
                         <div>
-                            <label className="block text-gray-700 font-medium mb-1">Current Company</label>
+                            <label className="block text-gray-700 font-medium mb-1">Current Company *</label>
                             <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className="w-full px-4 py-2 border rounded-md" />
                         </div>
                     )}
@@ -262,6 +281,11 @@ export default function RegisterPage() {
                         </button>
                     </div>
                 </form>
+                <p className="text-center mt-2 text-sm text-gray-600">By Registering, I consent to receive referral updates and follow-ups via WhatsApp *</p>
+                {/* <label className="flex text-center items-center gap-2 text-sm mt-2 text-gray-600">
+                    <input type="checkbox" required value="checked" />
+                    I consent to receive referral updates and follow-ups via WhatsApp.
+                </label> */}
                 <p className="text-center mt-6 text-sm text-gray-600">
                     Already registered?{' '}
                     <button onClick={() => navigate("/login")} className="text-blue-600 font-medium hover:underline">

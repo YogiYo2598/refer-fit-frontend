@@ -28,12 +28,12 @@ export const getIncomingReferrals = async (company) => {
 };
 
 // ✅ Mark a referral as referred/rejected
-export const updateReferralStatus = async (id, status) => {
+export const updateReferralStatus = async (id, data) => {
   const res = await fetch(`${API_BASE}/${id}/mark`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ status })
+    body: JSON.stringify(data)
   });
   return res.json();
 };

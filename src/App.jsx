@@ -96,6 +96,7 @@ import LoginPage from "./pages/Login";
 import DashboardPage from "./pages/Dashboard";
 import ProtectedRoute from './routes/protectedRoutes';
 
+
 export default function HomePage() {
   const logos = [
     { src: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg", alt: "Google", link: "https://careers.google.com" },
@@ -137,7 +138,8 @@ export default function HomePage() {
             <section className="w-full flex items-center justify-center px-4 py-10 text-center">
               <div className="w-full max-w-5xl text-gray-800 text-2xl font-medium space-y-2">
                 <p className="text-5xl font-bold">Get job referrals from our network of employees working at top companies</p>
-                <p className="text-base">With an employee referral, you're 23% more likely to land the job.</p>
+                <p className="text-base text-gray-500">Referrals done right — with automatic WhatsApp nudges to keep things on track</p>
+                {/* <p className="text-base"> We handle WhatsApp follow-ups with referrers to keep your application moving</p> */}
               </div>
             </section>
 
@@ -189,6 +191,38 @@ export default function HomePage() {
                 }
               `}</style>
             </section>
+
+            <footer className="bg-white text-center  text-sm text-gray-600">
+              {/* <p className="mb-2">© {new Date().getFullYear()} Refer Fit. All rights reserved.</p>
+              <div className="flex justify-center gap-4">
+                <a href="/terms" className="hover:underline">Terms</a>
+                <a href="/privacy" className="hover:underline">Privacy</a>
+                <a href="/contact" className="hover:underline">Contact</a>
+              </div> */}
+
+              <p className="mb-2">© {new Date().getFullYear()} Refer.Fit by MighTYTech LLP. All rights reserved.</p>
+
+              <div className="flex justify-center gap-4 mb-2">
+                <a href="/terms" className="hover:underline">Terms</a>
+                <a href="/privacy" className="hover:underline">Privacy</a>
+                <a href="/contact" className="hover:underline">Contact</a>
+              </div>
+
+              <div className="flex justify-center gap-4 mt-4">
+                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700">
+                  <i className="fab fa-twitter"></i> {/* FontAwesome */}
+                </a>
+                <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
+                  <i className="fab fa-facebook"></i>
+                </a>
+                <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:text-blue-900">
+                  <i className="fab fa-linkedin"></i>
+                </a>
+                <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-black">
+                  <i className="fab fa-github"></i>
+                </a>
+              </div>
+            </footer>
           </div>
         } />
         {/* Placeholder routes */}

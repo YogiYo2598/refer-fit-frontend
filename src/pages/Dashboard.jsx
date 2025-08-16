@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { createReferral, getMyReferrals, getIncomingReferrals, updateReferralStatus } from "../services/referralApi";
 import { logoutUser } from "../services/authApi";
 import { useAuth } from '../context/authContext';
+import { uploadResume } from "../services/uploadApi";
+import { updateUserResumeDetails } from "../services/userApi";
+import { getAllCompanies } from "../services/companyApi";
 
 export default function DashboardPage() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -25,24 +28,41 @@ export default function DashboardPage() {
     const pageSize = 5;
 
     const [sortBy, setSortBy] = useState("date");
-    const { user, setUser} = useAuth();
-    
+    const { user, setUser } = useAuth();
+
+    const [isExperienced, setisExperienced] = useState(true);
+    const [resumeAvailable, setResumeAvailable] = useState(false);
+
 
     const fetchData = async () => {
+        setLoading(true);
         const myReferralReqBody = {
             userId: user.id
         }
-        const myReferralRequests = await getMyReferrals('1');
+        const myReferralRequests = await getMyReferrals(user.id);
         setMyRequests([...myReferralRequests].sort((a, b) => {
             return new Date(b.createdAt) - new Date(a.createdAt);
         }
         ));
 
-        const myIncomingReferralsBody = {
-            'company': user.company
+        const allCompanyData = await getAllCompanies();
+        // console.log(allCompanyData);
+
+        if (user.company !== "") {
+            const myIncomingReferralsBody = {
+                'company': user.company
+            }
+            const myIncomingReferrals = await getIncomingReferrals(user.company);
+            setIncomingRequests(myIncomingReferrals)
+        } else {
+            setIncomingRequests([]);
+            setisExperienced(false);
         }
-        const myIncomingReferrals = await getIncomingReferrals('arm');
-        setIncomingRequests(myIncomingReferrals)
+
+        if (user.resumeName != null) {
+            setResumeAvailable(true);
+        }
+        setLoading(false);
     }
 
     useEffect(() => {
@@ -53,10 +73,8 @@ export default function DashboardPage() {
         }
         // This is added to make sure data is only loaded once
         if (!effectRan.current) {
-            setLoading(true);
             fetchData();
             effectRan.current = true;
-            setLoading(false);
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => {
@@ -74,19 +92,46 @@ export default function DashboardPage() {
         incomingPage * pageSize
     );
 
+    async function hashThreeInputs(input1, input2, input3) {
+        const combined = `${input1}${input2}${input3}`;
+        const encoded = new TextEncoder().encode(combined);
+        const buffer = await crypto.subtle.digest('SHA-256', encoded);
+        const hashArray = Array.from(new Uint8Array(buffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex + ".pdf";
+    }
+
     const handleNewReferralSubmit = async () => {
         setLoading(true);
-        const createReferralData = {
-            userId: '1',
-            jobId: jobId,
-            company: company,
-            resumeUrl: 'http://someurl.com'
-        }
+
         try {
+
+            const updateResumeDetails = user.resumeName === null ? true : false;
+            const fileName = user.resumeName !== null ? user.resumeName : await hashThreeInputs(user.id, user.name, user.email);
+            let uploadResponse = user.resumeURL
+            if (updateResumeDetails) {
+                uploadResponse = await uploadResume(resume, fileName);
+                const resumeData = {
+                    resumeName: fileName,
+                    resumeURL: uploadResponse
+                }
+                const response = updateUserResumeDetails(user.id, resumeData);
+            } else {
+                uploadResponse = user.resumeURL
+            }
+
+            const createReferralData = {
+                userId: user.id,
+                jobId: jobId,
+                company: company,
+                resumeUrl: uploadResponse
+            }
+
             const createRequest = await createReferral(createReferralData)
             setShowModal(false);
             fetchData();
             setLoading(false);
+            setResumeAvailable(true);
         } catch (error) {
             window.alert('Failed to create Referral Request! Pleae try again')
             setLoading(false);
@@ -94,38 +139,30 @@ export default function DashboardPage() {
         }
     }
 
-    const handleLogout = async() => {
+    const handleLogout = async () => {
         const response = await logoutUser();
         navigate('/')
     }
 
-    const isReferralFormValid = company.trim() !== "" && jobId.trim() !== "";
-
-    // const dummyRequests = [
-    //     { company: "Amazon", jobId: "AMZ12345", status: "Yet to be referred" },
-    //     { company: "Google", jobId: "GOOG56789", status: "Referred", referredBy: "Jane Williams" }
-    // ];
-
-    // const incomingRequests = [
-    //     { name: "Alice Smith", email: "alice@example.com", jobId: "AMZ12345", resumeUrl: "/resumes/alice-smith.pdf" },
-    //     { name: "John Doe", email: "john@example.com", jobId: "GOOG56789", resumeUrl: "/resumes/john-doe.pdf" }
-    // ];
-
-    const handleMarkReferred = async (index) => {
+    const handleStatusUpdate = async (index, value) => {
         setLoading(true);
+        // console.log("here")
+        // console.log(user);
         try {
-            const data = {
-                status: 'referred'
+            const payload = {
+                status: value,
+                referredBy: user.id
             }
-            const response = await updateReferralStatus(index, 'referred');
+            const response = await updateReferralStatus(index, payload);
             fetchData();
             setLoading(false);
         }
         catch (error) {
             setLoading(false);
         }
-        // setReferredStatus(prev => ({ ...prev, [index]: true }));
     };
+
+    const isReferralFormValid = company.trim() !== "" && jobId.trim() !== "";
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-100 to-blue-100">
@@ -145,7 +182,7 @@ export default function DashboardPage() {
 
                     {dropdownOpen && (
                         <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-md py-2 z-50">
-                            <a href="/edit-profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-100">Edit Profile</a>
+                            {/* <a href="/edit-profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-100">Edit Profile</a> */}
                             <a onClick={handleLogout} className="block px-4 py-2 text-gray-700 hover:bg-gray-100">Logout</a>
                         </div>
                     )}
@@ -168,15 +205,24 @@ export default function DashboardPage() {
                         <table className="w-full min-w-[600px] text-left">
                             <thead className="bg-gray-100">
                                 <tr>
+                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Status</th>
                                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Company</th>
                                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Job ID</th>
                                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Created Date</th>
-                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginatedMyReferrals.map((req, idx) => (
                                     <tr key={idx} className="border-t">
+                                        <td className="px-4 py-2 text-sm font-medium">
+                                            <span
+                                                title="test"
+                                                // title={req.status === 'referred' ? `Referred by ${req.referred_by_user}` : ''}
+                                                className={`px-2 py-1 rounded-full text-white text-xs ${req.status === 'referred' ? 'bg-green-500' : req.status === 'position_closed' ? 'bg-red-500' : 'bg-yellow-500'}`}
+                                            >
+                                                {req.status}
+                                            </span>
+                                        </td>
                                         <td className="px-4 py-2 text-gray-700">{req.company}</td>
                                         <td className="px-4 py-2 text-gray-700">{req.jobId}</td>
                                         <td className="px-4 py-2 text-gray-700">{new Date(req.createdAt).toLocaleDateString("en-IN", {
@@ -184,87 +230,86 @@ export default function DashboardPage() {
                                             month: "short",
                                             day: "numeric"
                                         })}</td>
-                                        <td className="px-4 py-2 text-sm font-medium">
-                                            <span
-                                                title={req.status === 'referred' ? `Referred by ${req.referredBy}` : ''}
-                                                className={`px-2 py-1 rounded-full text-white text-xs ${req.status === 'referred' ? 'bg-green-500' : 'bg-yellow-500'}`}
-                                            >
-                                                {req.status}
-                                            </span>
-                                        </td>
+                                        
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
                     <div className="flex justify-center gap-2 mt-4 mb-6">
-                        <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1} className="px-3 py-1 bg-blue-600 rounded disabled:bg-gray-400 disabled:opacity-50">Prev</button>
-                        <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage * pageSize >= myRequests.length} className="px-3 py-1 bg-blue-600 rounded disabled:bg-gray-400 disabled:opacity-50">Next</button>
+                        <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1} className="px-3 py-1 bg-blue-600 rounded text-white disabled:bg-gray-400 disabled:opacity-50">Prev</button>
+                        <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage * pageSize >= myRequests.length} className="px-3 py-1 bg-blue-600 text-white rounded disabled:bg-gray-400 disabled:opacity-50">Next</button>
                     </div>
                 </section>
 
-                <section>
-                    <h2 className="text-2xl font-bold text-blue-700 mb-4">Referral Requests to My Company</h2>
-                    <div className="bg-white shadow rounded-lg overflow-x-auto">
-                        <table className="w-full min-w-[800px] text-left">
-                            <thead className="bg-gray-100">
-                                <tr>
-                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Candidate Name</th>
-                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Email</th>
-                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Job ID</th>
-                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Requested On</th>
-                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Resume</th>
-                                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedIncomingReferrals.map((req, idx) => (
-                                    <tr key={idx} className="border-t">
-                                        <td className="px-4 py-2 text-gray-700">{req.User.name}</td>
-                                        <td className="px-4 py-2 text-gray-700">{req.User.email}</td>
-                                        <td className="px-4 py-2 text-gray-700">{req.jobId}</td>
-                                        <td className="px-4 py-2 text-gray-700">{new Date(req.createdAt).toLocaleDateString("en-IN", {
-                                            year: "numeric",
-                                            month: "short",
-                                            day: "numeric"
-                                        })}</td>
-                                        <td className="px-4 py-2">
-                                            <a
-                                                href={req.resumeUrl}
-                                                className="text-blue-600 hover:underline text-sm"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                            >
-                                                Download
-                                            </a>
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            {referredStatus[idx] ? (
-                                                <span className="text-green-600 text-sm font-medium">Thank you</span>
-                                            ) : (
-                                                <button
-                                                    className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
-                                                    onClick={() => handleMarkReferred(req.id)}
-                                                >
-                                                    Mark as Referred
-                                                </button>
-                                            )}
-                                        </td>
+                {isExperienced && (
+                    <section>
+                        <h2 className="text-2xl font-bold text-blue-700 mb-4">Referral Requests to My Company</h2>
+                        <div className="bg-white shadow rounded-lg overflow-x-auto">
+                            <table className="w-full min-w-[800px] text-left">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th className="px-4 py-3 w-[50px] text-sm font-semibold text-gray-700">Action</th>
+                                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Candidate Name</th>
+                                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Email</th>
+                                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Job ID</th>
+                                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Resume</th>
+                                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Requested On</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="flex justify-center gap-2 mt-4 mb-6">
-                        <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={incomingPage === 1} className="px-3 py-1 bg-blue-600 rounded disabled:bg-gray-400 disabled:opacity-50">Prev</button>
-                        <button onClick={() => setCurrentPage(p => p + 1)} disabled={incomingPage * pageSize >= incomingRequests.length} className="px-3 py-1 bg-blue-600 rounded disabled:bg-gray-400 disabled:opacity-50">Next</button>
-                    </div>
-                </section>
+                                </thead>
+                                <tbody>
+                                    {paginatedIncomingReferrals.map((req, idx) => (
+                                        <tr key={req.id} className="border-t">
+                                            <td className="px-2 py-2 w-[50px]">
+                                                <select
+                                                    onChange={(e) => handleStatusUpdate(req.id, e.target.value)}
+                                                    defaultValue=""
+                                                    className="px-2 py-1 rounded-md border bg-white text-sm"
+                                                >
+                                                    <option value="" disabled>
+                                                        Update status
+                                                    </option>
+                                                    <option value="referred">Referred</option>
+                                                    <option value="position_closed">Position Closed</option>
+                                                    <option value="already_referred">Already Referred</option>
+                                                    {/* <option value="need_more_details">Need More Details</option> */}
+                                                </select>
+                                            </td>
+                                            <td className="px-4 py-2 text-gray-700">{req.User.name}</td>
+                                            <td className="px-4 py-2 text-gray-700">{req.User.email}</td>
+                                            <td className="px-4 py-2 text-gray-700">{req.jobId}</td>
+                                            <td className="px-4 py-2">
+                                                <a
+                                                    href={req.resumeUrl}
+                                                    className="text-blue-600 hover:underline text-sm"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    Download
+                                                </a>
+                                            </td>
+                                            <td className="px-4 py-2 text-gray-700">{new Date(req.createdAt).toLocaleDateString("en-IN", {
+                                                year: "numeric",
+                                                month: "short",
+                                                day: "numeric"
+                                            })}</td>
+                                            
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="flex justify-center gap-2 mt-4 mb-6">
+                            <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={incomingPage === 1} className="px-3 py-1 bg-blue-600 rounded text-white disabled:bg-gray-400 disabled:opacity-50">Prev</button>
+                            <button onClick={() => setCurrentPage(p => p + 1)} disabled={incomingPage * pageSize >= incomingRequests.length} className="px-3 py-1 bg-blue-600 text-white rounded disabled:bg-gray-400 disabled:opacity-50">Next</button>
+                        </div>
+                    </section>
+                )}
             </main>
 
             {/* Create Referral Request Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-30">
                     <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
                         <h3 className="text-xl font-semibold text-blue-600 mb-4">Create Referral Request</h3>
                         <div className="space-y-4">
@@ -288,6 +333,7 @@ export default function DashboardPage() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Upload Resume</label>
+                                {resumeAvailable && (<label className="text-green-700"><b>Resume found in our records. Upload to replace the existing one if needed.</b></label>)}
                                 <input
                                     type="file"
                                     onChange={(e) => setResume(e.target.files[0])}
