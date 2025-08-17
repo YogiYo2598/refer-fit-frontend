@@ -37,3 +37,13 @@ export const updateReferralStatus = async (id, data) => {
   });
   return res.json();
 };
+
+// Delete referral 
+export const deleteReferralRequest = async (id) => {
+  const res = await fetch(`${API_BASE}/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include'
+  });
+  return res.json();
+}

@@ -6,7 +6,7 @@ import { getOTP, verifyOTP } from "../services/authApi";
 export default function RegisterPage() {
     const navigate = useNavigate();
 
-    const [status, setStatus] = useState("student");
+    const [status, setStatus] = useState("fresher");
     const [verifyPhone, setVerifyPhone] = useState(false);
     const [verifyEmail, setVerifyEmail] = useState(false);
 

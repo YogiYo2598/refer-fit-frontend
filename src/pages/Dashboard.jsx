@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from 'react-router-dom';
-import { createReferral, getMyReferrals, getIncomingReferrals, updateReferralStatus } from "../services/referralApi";
+import { createReferral, getMyReferrals, getIncomingReferrals, updateReferralStatus, deleteReferralRequest } from "../services/referralApi";
 import { logoutUser } from "../services/authApi";
 import { useAuth } from '../context/authContext';
 import { uploadResume } from "../services/uploadApi";
@@ -13,10 +13,12 @@ export default function DashboardPage() {
     const [company, setCompany] = useState("");
     const [jobId, setJobId] = useState("");
     const [resume, setResume] = useState(null);
+    const [resumeUpdated, setResumeUpdated] = useState(false);
     const [referredStatus, setReferredStatus] = useState({});
     const dropdownRef = useRef(null);
     const effectRan = useRef(false);
     const navigate = useNavigate();
+    const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
     const [myRequests, setMyRequests] = useState([]);
     const [incomingRequests, setIncomingRequests] = useState([]);
@@ -101,23 +103,54 @@ export default function DashboardPage() {
         return hashHex + ".pdf";
     }
 
+    const handleDeleteReferral = async (id) => {
+        const response = await deleteReferralRequest(id);
+        fetchData();
+    }
+
     const handleNewReferralSubmit = async () => {
         setLoading(true);
 
         try {
 
-            const updateResumeDetails = user.resumeName === null ? true : false;
-            const fileName = user.resumeName !== null ? user.resumeName : await hashThreeInputs(user.id, user.name, user.email);
-            let uploadResponse = user.resumeURL
-            if (updateResumeDetails) {
+            // checking for same referral/JOB ID
+            const exists = myRequests.some((req) => req.jobId === jobId);
+            if (exists) {
+                window.alert("You have already raised request for this jobId!");
+                setLoading(false);
+                return;
+            }
+
+            if (user.company.toLowerCase() == company.toLowerCase()) {
+                window.alert("Not allowed to create referral for the company you are working!");
+                setLoading(false);
+                return;
+            }
+
+            // If resume if uploaded, no referrals request can be raised
+            if (user.resumeName === null && resume === null) {
+                window.alert("Please upload resume");
+                setLoading(false);
+                return;
+            }
+
+            // all validations related to resume
+            let uploadResponse = user.resumeURL;
+            if (resumeUpdated) {
+                if (resume.size > 5 * 1024 * 1024) {
+                    window.alert("File size should be less than 5MB!");
+                    setLoading(false);
+                    return;
+                }
+                const fileName = user.resumeName !== null ? user.resumeName : await hashThreeInputs(user.id, user.name, user.phone);
                 uploadResponse = await uploadResume(resume, fileName);
                 const resumeData = {
                     resumeName: fileName,
                     resumeURL: uploadResponse
                 }
-                const response = updateUserResumeDetails(user.id, resumeData);
+                updateUserResumeDetails(user.id, resumeData);
             } else {
-                uploadResponse = user.resumeURL
+                uploadResponse = user.resumeURL;
             }
 
             const createReferralData = {
@@ -127,7 +160,11 @@ export default function DashboardPage() {
                 resumeUrl: uploadResponse
             }
 
-            const createRequest = await createReferral(createReferralData)
+
+
+            await createReferral(createReferralData);
+            setJobId('');
+            setCompany('');
             setShowModal(false);
             fetchData();
             setLoading(false);
@@ -135,7 +172,6 @@ export default function DashboardPage() {
         } catch (error) {
             window.alert('Failed to create Referral Request! Pleae try again')
             setLoading(false);
-
         }
     }
 
@@ -197,7 +233,7 @@ export default function DashboardPage() {
                 )}
                 <section>
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-2xl font-bold text-blue-700">My Referral Requests</h2>
+                        <h2 className="text-2xl font-bold text-blue-700">My Referral Requests {myRequests.length > 0 && ` (Total: ${myRequests.length})`}</h2>
                         <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">+ New Request</button>
                     </div>
 
@@ -209,6 +245,7 @@ export default function DashboardPage() {
                                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Company</th>
                                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Job ID</th>
                                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Created Date</th>
+                                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Delete Request</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -230,7 +267,41 @@ export default function DashboardPage() {
                                             month: "short",
                                             day: "numeric"
                                         })}</td>
-                                        
+                                        <td className="px-4 py-2  text-center">
+                                            {/* <button
+                                                onClick={() => handleDeleteReferral(req.id)}
+                                                className="text-red-500 hover:text-red-700 text-lg font-bold"
+                                                title="Delete this request"
+                                            >
+                                                ❌
+                                            </button> */}
+
+                                            {confirmDeleteId === req.id ? (
+                                                <div className="gap-2 text-center">
+                                                    <button
+                                                        onClick={() => handleDeleteReferral(req.id)}
+                                                        className="text-red-600 font-semibold text-xs mr-[20px]"
+                                                    >
+                                                        Yes
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setConfirmDeleteId(null)}
+                                                        className="text-gray-500 font-semibold text-xs"
+                                                    >
+                                                        No
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setConfirmDeleteId(req.id)}
+                                                    className="text-red-500 hover:text-red-700 text-lg font-bold"
+                                                    title="Delete this request"
+                                                >
+                                                    ❌
+                                                </button>
+                                            )}
+                                        </td>
+
                                     </tr>
                                 ))}
                             </tbody>
@@ -244,7 +315,7 @@ export default function DashboardPage() {
 
                 {isExperienced && (
                     <section>
-                        <h2 className="text-2xl font-bold text-blue-700 mb-4">Referral Requests to My Company</h2>
+                        <h2 className="text-2xl font-bold text-blue-700 mb-4">Referral Requests to My Company {incomingRequests.length > 0 && ` (Total: ${incomingRequests.length})`}</h2>
                         <div className="bg-white shadow rounded-lg overflow-x-auto">
                             <table className="w-full min-w-[800px] text-left">
                                 <thead className="bg-gray-100">
@@ -293,7 +364,7 @@ export default function DashboardPage() {
                                                 month: "short",
                                                 day: "numeric"
                                             })}</td>
-                                            
+
                                         </tr>
                                     ))}
                                 </tbody>
@@ -314,7 +385,7 @@ export default function DashboardPage() {
                         <h3 className="text-xl font-semibold text-blue-600 mb-4">Create Referral Request</h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Company *</label>
                                 <input
                                     type="text"
                                     value={company}
@@ -323,7 +394,7 @@ export default function DashboardPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Job ID</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Job ID *</label>
                                 <input
                                     type="text"
                                     value={jobId}
@@ -332,11 +403,12 @@ export default function DashboardPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Resume</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Resume * <b>only PDF(max. 5MB) </b></label>
                                 {resumeAvailable && (<label className="text-green-700"><b>Resume found in our records. Upload to replace the existing one if needed.</b></label>)}
                                 <input
                                     type="file"
-                                    onChange={(e) => setResume(e.target.files[0])}
+                                    accept="application/pdf"
+                                    onChange={(e) => { setResume(e.target.files[0]); setResumeUpdated(true); }}
                                     className="w-full px-4 py-2 border rounded-md"
                                 />
                             </div>
