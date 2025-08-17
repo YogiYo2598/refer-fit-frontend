@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState , useRef, useEffect} from "react";
+import CreatableSelect from 'react-select/creatable';
 import { useNavigate } from "react-router-dom";
 import { createUser } from "../services/userApi"
 import { getOTP, loginUser, verifyOTP } from "../services/authApi";
+import { getAllCompanies } from "../services/companyApi";
 
 export default function BecomeReferrerPage() {
     const navigate = useNavigate();
@@ -21,6 +23,10 @@ export default function BecomeReferrerPage() {
     const [isEmailVerifyClicked, setIsEmailVerifyClicked] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    const [company1, setCompany1] = useState(null);
+    const [companyOptions, setCompanyOptions] = useState([]);
+    const effectRan = useRef(false);
+
     const isValidPhone = /^\d{10}$/.test(phone);
     const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     const isValidOtp = (otp) => /^\d{4}$/.test(otp);
@@ -30,7 +36,20 @@ export default function BecomeReferrerPage() {
         isValidPhone &&
         isPhoneOtpVerified &&
         isValidEmail &&
-        company.trim() !== "";
+        company1 &&
+        company1.value.trim() !== "";
+    
+    const fetchData = async () => {
+        const comp = await getAllCompanies();
+        setCompanyOptions(comp);
+    }
+
+    useEffect(() => {
+        if (!effectRan.current) {
+            fetchData();
+            effectRan.current = true;
+        }
+    })
 
     const handleResendPhone = () => {
         if (!isPhoneOtpVerified) {
@@ -64,7 +83,7 @@ export default function BecomeReferrerPage() {
             setIsPhoneVerifyClicked(true);
             setLoading(false)
         }
-        
+
     };
 
     const verifyValidOTP = async () => {
@@ -75,7 +94,7 @@ export default function BecomeReferrerPage() {
             code: otpPhone
         }
         const response = await verifyOTP(req_data);
-        if(!response['ok']) {
+        if (!response['ok']) {
             window.alert("Invalid OTP, Please enter right OTP");
             setLoading(false);
         } else {
@@ -87,11 +106,12 @@ export default function BecomeReferrerPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        
         const user_data = {
             name: name,
             phone: phone,
             email: email,
-            company: company,
+            company: company1.value,
             role: 'referrer',
             type: 'experienced'
         }
@@ -189,12 +209,23 @@ export default function BecomeReferrerPage() {
 
                     <div>
                         <label className="block text-gray-700 font-medium mb-1">Current Company *</label>
-                        <input
+                        {/* <input
                             type="text"
                             value={company}
                             onChange={(e) => setCompany(e.target.value)}
                             className="w-full px-4 py-2 border rounded-md"
                             required
+                        /> */}
+                        <CreatableSelect
+                            options={companyOptions}
+                            value={company1}
+                            onChange={setCompany1}
+                            placeholder="Start typing to search or add..."
+                            isClearable
+                            noOptionsMessage={({ inputValue }) =>
+                                inputValue ? `No matches for "${inputValue}"` : "Start typing..."
+                            }
+                            className="text-sm"
                         />
                     </div>
 

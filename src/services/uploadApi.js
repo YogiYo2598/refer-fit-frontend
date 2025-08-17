@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api/upload/resume';
+const API_BASE = '/api/upload/resume';
 
 export const uploadResume =  async (file, fileName) => {
     const formData = new FormData();

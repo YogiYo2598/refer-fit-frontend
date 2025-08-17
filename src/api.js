@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 export const requestOtp = (phone) =>
   fetch(`${API_BASE}/auth/request-otp`, {

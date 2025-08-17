@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api/referrals';
+const API_BASE = '/api/referrals';
 
 // ✅ Create a new referral request
 export const createReferral = async (data) => {

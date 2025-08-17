@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
+import Select from 'react-select';
 import { useNavigate } from 'react-router-dom';
 import { createReferral, getMyReferrals, getIncomingReferrals, updateReferralStatus, deleteReferralRequest } from "../services/referralApi";
 import { logoutUser } from "../services/authApi";
 import { useAuth } from '../context/authContext';
 import { uploadResume } from "../services/uploadApi";
 import { updateUserResumeDetails } from "../services/userApi";
-import { getAllCompanies } from "../services/companyApi";
+import { getNetworkCompanies } from "../services/companyApi";
+
+
 
 export default function DashboardPage() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -35,6 +38,13 @@ export default function DashboardPage() {
     const [isExperienced, setisExperienced] = useState(true);
     const [resumeAvailable, setResumeAvailable] = useState(false);
 
+    const [selectedCompany, setSelectedCompany] = useState(null);
+    const [companyOptions, setCompanyOptions] = useState([])
+
+
+    // let companyOptions = [];
+
+
 
     const fetchData = async () => {
         setLoading(true);
@@ -47,7 +57,7 @@ export default function DashboardPage() {
         }
         ));
 
-        const allCompanyData = await getAllCompanies();
+        // const allCompanyData = await getAllCompanies();
         // console.log(allCompanyData);
 
         if (user.company !== "") {
@@ -64,6 +74,10 @@ export default function DashboardPage() {
         if (user.resumeName != null) {
             setResumeAvailable(true);
         }
+
+        const compOptions = await getNetworkCompanies();
+        setCompanyOptions(compOptions);
+        // console.log(companyOptions);
         setLoading(false);
     }
 
@@ -114,6 +128,7 @@ export default function DashboardPage() {
         try {
 
             // checking for same referral/JOB ID
+            // console.log('company - ' + company)
             const exists = myRequests.some((req) => req.jobId === jobId);
             if (exists) {
                 window.alert("You have already raised request for this jobId!");
@@ -165,6 +180,7 @@ export default function DashboardPage() {
             await createReferral(createReferralData);
             setJobId('');
             setCompany('');
+            setSelectedCompany(null)
             setShowModal(false);
             fetchData();
             setLoading(false);
@@ -386,11 +402,20 @@ export default function DashboardPage() {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Company *</label>
-                                <input
+                                {/* <input
                                     type="text"
                                     value={company}
                                     onChange={(e) => setCompany(e.target.value)}
                                     className="w-full px-4 py-2 border rounded-md"
+                                /> */}
+                                <Select
+                                    options={companyOptions}
+                                    value={selectedCompany}
+                                    onChange={(selected) => {setSelectedCompany(selected);setCompany(selected.value)}}
+                                    placeholder="Search or select a company"
+                                    noOptionsMessage={() => "Company not found in our network"}
+                                    isClearable
+                                    className="text-sm"
                                 />
                             </div>
                             <div>

@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api/users';
+const API_BASE = '/api/users';
 
 
 export const createUser = async (userData) => {

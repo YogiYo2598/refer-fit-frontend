@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import CreatableSelect from 'react-select/creatable';
 import { useNavigate } from "react-router-dom";
 import { createUser } from "../services/userApi"
 import { getOTP, verifyOTP } from "../services/authApi";
+import { getAllCompanies } from "../services/companyApi";
 
 export default function RegisterPage() {
     const navigate = useNavigate();
@@ -27,12 +29,30 @@ export default function RegisterPage() {
     const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     const isValidOtp = (otp) => /^\d{4}$/.test(otp);
 
+    const [company1, setCompany1] = useState(null);
+    const [companyOptions, setCompanyOptions] = useState([]);
+    const effectRan = useRef(false);
+
     const isFormValid =
         name.trim() !== "" &&
         isValidPhone &&
         isValidEmail &&
         isPhoneOtpVerified &&
-        (status === "fresher" || (status === "experienced" && company.trim() !== ""));
+        (status === "fresher" || (status === "experienced" &&
+        company1 &&
+        company1.value.trim() !== ""));
+
+    const fetchData = async () => {
+        const comp = await getAllCompanies();
+        setCompanyOptions(comp);
+    }
+
+    useEffect(() => {
+        if (!effectRan.current) {
+            fetchData();
+            effectRan.current = true;
+        }
+    })
 
     const handleResendPhone = () => {
         if (!isPhoneOtpVerified) {
@@ -61,7 +81,7 @@ export default function RegisterPage() {
             name: name,
             phone: phone,
             email: email,
-            company: company,
+            company: company1.value,
             role: 'requester',
             type: status
         }
@@ -251,7 +271,18 @@ export default function RegisterPage() {
                     {status === "experienced" && (
                         <div>
                             <label className="block text-gray-700 font-medium mb-1">Current Company *</label>
-                            <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className="w-full px-4 py-2 border rounded-md" />
+                            {/* <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className="w-full px-4 py-2 border rounded-md" /> */}
+                            <CreatableSelect
+                                options={companyOptions}
+                                value={company1}
+                                onChange={setCompany1}
+                                placeholder="Start typing to search or add..."
+                                isClearable
+                                noOptionsMessage={({ inputValue }) =>
+                                    inputValue ? `No matches for "${inputValue}"` : "Start typing..."
+                                }
+                                className="text-sm"
+                            />
                         </div>
                     )}
 
